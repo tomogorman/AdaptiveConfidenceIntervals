@@ -56,14 +56,23 @@
 #    bplimits <- adaptive.ci(dfbp,depvar,complete,reduced,civar)
 #
 #    The vector bplimits will contain the lower and upper limits.
-#    If we needed to include age as a covariate we would use:
 #
+#    We could expand this example if we needed to include age as a
+#    covariate. We would use:
+#
+#    source("adaptive.ci.r")
+#    depvar   <- c("bp");
 #    complete <- c("bp~age+group")
 #    reduced  <- c("bp~age)
+#    civar    <- c("group");
 #    bplimits <- adaptive.ci(dfbp,depvar,complete,reduced,civar)
 #
-#  These functions were carefully checked on May 24, 2016
+#  These functions were carefully checked on May 24, 2016, and I believe
+#  that these functions are correct.  However, the author is not
+#  responsible for any errors that may still exist in the code.
 #
+#  Please report any problems with this code to T. W. O'Gorman via 
+#  email at twogorman@gmail.com
 #
 
 adaptive.ci <- function(ci.df, depvar, complete, reduced, civar,
