@@ -5,7 +5,7 @@
 #
 #  Reference: O'Gorman, T. W. Reducing the width of confidence intervals
 #             for the difference between two population means by inverting
-#             adaptive tests.  2016.
+#             adaptive tests.  Submitted for publication.
 #
 #  The function arguments are:
 #
