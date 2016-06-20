@@ -1,5 +1,3 @@
-# AdaptiveConfidenceIntervals
-
 
   This adaptive.ci function computes 95% confidence intervals limits
   for any single coefficient in a linear model having fixed effects.
@@ -15,12 +13,11 @@
   Operating System:  Windows 7 Professional
 
   Packages needed: None
-
-  Before attempting to use this function, the user should read   
+  
 
     Reference: O'Gorman, T. W. Reducing the width of confidence intervals
                for the difference between two population means by inverting
-               adaptive tests.  2016.
+               adaptive tests.  Submitted for publication.
 
   The function is called by:
 
