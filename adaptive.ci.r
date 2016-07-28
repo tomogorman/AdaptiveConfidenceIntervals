@@ -1,6 +1,6 @@
 #
 #                                         Program:  adaptive.ci.r
-#                                         Revision date: July 15, 2016
+#                                         Revision date: July 28, 2016
 #
 #  This adaptive.ci function computes 95% confidence intervals limits
 #  for any single coefficient in a linear model having fixed effects.
@@ -156,15 +156,16 @@ if(details == 1) {
     }
   }
 
-#  The next line loops over the left limit estimate (lefttail=1) and
-#  the right tail estimate (lefttail=2).
+#  The next line loops over the lower limit estimate (lowerlimit=1) and
+#  the upper limit estimate (lowerlimit=2).
 
-for(lefttail in 1:2) {
+for(lowerlimit in 1:2) {
+  if(lowerlimit == 1) lefttail <- 0 else lefttail <- 1
 
-  if((lefttail == 1) & (details == 1)) cat("\n\n"," Begin Left Tail","\n\n\n")
-  if((lefttail != 1) & (details == 1)) cat("\n\n"," Begin Right Tail","\n\n\n")
+  if((lowerlimit == 1) & (details == 1)) cat("\n\n"," Begin Lower Limit","\n\n\n")
+  if((lowerlimit != 1) & (details == 1)) cat("\n\n"," Begin Upper Limit","\n\n\n")
 
-  if(lefttail == 2) {
+  if(lowerlimit == 2) {
     e01 <- e99
     e04 <- e96
     }
@@ -191,13 +192,13 @@ for(lefttail in 1:2) {
     s2  <- plist[[3]]
     s3  <- plist[[4]]
 
-    if( ( lefttail == 1) && (details == 1) ) {
-      cat("left tail lower estimate = ", e01, " p-value = ", p01, "\n")
-      cat("left tail upper estimate = ", e04, " p-value = ", p04, "\n\n")
+    if( ( lowerlimit == 1) && (details == 1) ) {
+      cat("Lower limit low estimate  = ", e01, " p-value = ", p01, "\n")
+      cat("Lower limit high estimate = ", e04, " p-value = ", p04, "\n\n")
       }
-    if( ( lefttail != 1) && (details == 1) ) {
-      cat("right tail upper estimate = ", e01, " p-value = ", p01, "\n")
-      cat("right tail lower estimate = ", e04, " p-value = ", p04, "\n\n")
+    if( ( lowerlimit != 1) && (details == 1) ) {
+      cat("Upper limit low estimate  = ", e01, " p-value = ", p01, "\n")
+      cat("Upper limit high estimate = ", e04, " p-value = ", p04, "\n\n")
       }
 
     # In the next line, if the interval includes alpha/2 we stop the loop.
@@ -265,9 +266,9 @@ for(lefttail in 1:2) {
 
     # This is the end of the search for one of the limits.
 
-    if(nblocks == 1) { limits[lefttail] <- l[1]
+    if(nblocks == 1) { limits[lowerlimit] <- l[1]
       } else {
-      limits[lefttail] <- l[i]
+      limits[lowerlimit] <- l[i]
       }
     }
 
@@ -335,8 +336,8 @@ if(reduced == simple) {
                weights = dfadonetail$w2perm)
     tperm <- summary(compw)$coefficients[indvar,3]
 
-    if( (lefttail == 1) & (tperm >= tunperm) ) e  <-  e + 1
-    if( (lefttail != 1) & (tperm <= tunperm) ) e  <-  e + 1
+    if( (lefttail == 1) & (tperm <= tunperm) ) e  <-  e + 1
+    if( (lefttail != 1) & (tperm >= tunperm) ) e  <-  e + 1
     }
   }
 
@@ -356,8 +357,8 @@ if(reduced != simple) {
                weights = dfadonetail$w2)
 
     tperm  <- summary(compw)$coefficients[indvar,3]
-    if( (lefttail == 1) & (tperm >= tunperm) ) e  <-  e + 1
-    if( (lefttail != 1) & (tperm <= tunperm) ) e  <-  e + 1
+    if( (lefttail == 1) & (tperm <= tunperm) ) e  <-  e + 1
+    if( (lefttail != 1) & (tperm >= tunperm) ) e  <-  e + 1
     }
   }
 p <- (e+1)/(r+1)
@@ -408,7 +409,7 @@ residdh <- resid/h
 
 for (i in 1:n) {
   phi  <- pnorm(residdh[i] - residdh)
-  fhat <- mean(phi)
+  fhat <- sum(phi)/length(phi)
   z    <- qnorm(fhat)
   if( abs(s[i]) >= 0.0001 ) w[i] <- z/s[i] else w[i] <- 1 
   }
@@ -456,7 +457,7 @@ rootcdffast <- function(x,h,p,xlow,xhigh,tolerance) {
 #
 cdfhat <- function(xvector,h,xpoint){
   phi <- pnorm((xpoint-xvector)/h)
-  cdf <- mean(phi)
+  cdf <- sum(phi)/length(phi)
   return(cdf)
   }
 
