@@ -1,6 +1,6 @@
 #
 #                                         Program:  adaptive.ci.r
-#                                         Revision date: July 28, 2016
+#                                         Revision Date: August 4, 2016
 #
 #  This adaptive.ci function computes 95% confidence intervals limits
 #  for any single coefficient in a linear model having fixed effects.
@@ -10,6 +10,11 @@
 #             for the difference between two population means by inverting
 #             adaptive tests. Statistical Methods in Medical Research,
 #             in press.
+#
+#  The confidence limits are found by calling the function
+#
+#       adaptive.ci <- function(ci.df, depvar, complete, reduced, civar,
+#         equalwts=0, nblocks=2, s1=7832, s2=25933, s3=19857, details=1) 
 #
 #  The function arguments are:
 #
@@ -43,7 +48,7 @@
 #       then you only need to enter the first five arguments.
 #    2) The data frame cannot contain missing values for any variables
 #       used in the complete model.
-#    3) This function calls the adonetailp, adaptiveweights, rootcdffast,
+#    3) This function calls the adonetailp, adaptiveweights, rootcdf,
 #       cdfhat, and shufflewh functions.
 #    4) This function is written in base R.  No packages are required. 
 #
@@ -101,7 +106,7 @@ if(details == 1) {
   cat("    Depandent variable: ",depvar, "\n")
   cat("    Complete model: ",complete,"\n")
   cat("    Reduced model : ",reduced,"\n")
-  cat("    Confidence Interval for = : ",civar, "\n")
+  cat("    Confidence Interval for : ",civar, "\n")
   cat("    Maximum number of blocks = ", nblocks,"\n")
   cat("    Random seeds = ",s1,s2, s3,"\n")
   cat("    Number of permutations for first blocks = ",r,"\n\n")
@@ -158,6 +163,8 @@ if(details == 1) {
 
 #  The next line loops over the lower limit estimate (lowerlimit=1) and
 #  the upper limit estimate (lowerlimit=2).
+#  Note: If lowerlimit = 1 we will compute the right tail p-value,
+#  so we will set lefttail = 0.
 
 for(lowerlimit in 1:2) {
   if(lowerlimit == 1) lefttail <- 0 else lefttail <- 1
@@ -377,9 +384,15 @@ red <- lm(as.formula(reduced), data=dfweights)
 resid <- residuals(red)
 
 #                               compute traditional quantiles
+probs <- c(0.10, 0.25, 0.40, 0.60, 0.75, 0.90)
+q <- quantile(resid,probs,type=6)
+q10 <- q[1]
+q25 <- q[2]
+q40 <- q[3]
+q60 <- q[4]
+q75 <- q[5]
+q90 <- q[6]
 
-q25 <- quantile(resid,0.25,type=6)
-q75 <- quantile(resid,0.75,type=6)
 iqr <- q75 - q25
 sigmat <- iqr/1.349
 
@@ -390,13 +403,12 @@ h <- 1.587*sigmat*n^(-0.33333333333)
 
 minr  <- min(resid)
 maxr  <- max(resid)
-range <- maxr - minr
-lower <- minr - range/2
-upper <- maxr + range/2
+lower <- minr - iqr/10
+upper <- maxr + iqr/10
 tol   <- 0.000000001*iqr
-cdf25 <- rootcdffast(resid,h,0.25,lower,maxr,tol)
-cdf50 <- rootcdffast(resid,h,0.50,minr, maxr,tol)
-cdf75 <- rootcdffast(resid,h,0.75,minr,upper,tol)
+cdf25 <- rootcdf(resid,h,0.25,q10,q40,lower,maxr,tol)
+cdf50 <- rootcdf(resid,h,0.50,q40,q60,minr,maxr,tol)
+cdf75 <- rootcdf(resid,h,0.75,q60,q90,minr,upper,tol)
 sigma <- (cdf75-cdf25)/1.349
 
 #                               compute adaptive weights
@@ -407,9 +419,10 @@ dfweights$w2 <- double(n)
 
 residdh <- resid/h
 
+
 for (i in 1:n) {
   phi  <- pnorm(residdh[i] - residdh)
-  fhat <- sum(phi)/length(phi)
+  fhat <- sum(phi)/n
   z    <- qnorm(fhat)
   if( abs(s[i]) >= 0.0001 ) w[i] <- z/s[i] else w[i] <- 1 
   }
@@ -423,29 +436,36 @@ return(dfweights)
 #
 #  This root finding function is used to compute the pth percentile,
 #  based on the smoothed cumulative distribution function.
-#  It uses bisection for the first few iterations, then
-#  switches to the false position method for the
+#  If the interval [xlow, xhigh] contains the percentile then
+#  it proceeds with finding the root; otherwise it uses the much
+#  wider interval [lower,upper]. The function uses bisection for the first
+#  few iterations, then uses the false position method for the
 #  remaining iterations.  Convergence is achieved when the cdf
 #  is within a small tolerance around the desired percentile.
 #
 
-rootcdffast <- function(x,h,p,xlow,xhigh,tolerance) {
+rootcdf <- function(x,h,p,xlow,xhigh,lower,upper,tolerance) {
+  nbisections <- 3
   flow  <-  cdfhat(x,h,xlow)
   fhigh  <-  cdfhat(x,h,xhigh)  
   if ( (flow >p) | (fhigh < p) ) {
-    cat("Stop in rootcdffast flow,fhigh=",flow,fhigh);q() }
+    nbisections <- 8
+    xlow  <- lower
+    xhigh <- upper
+    flow  <-  cdfhat(x,h,xlow)
+    fhigh  <-  cdfhat(x,h,xhigh)  
+                                   }
   for (i in seq(1:60) ) {
-    if( i < 8 ) {
+    if( i < nbisections ) {
       xmiddle <- (xlow+xhigh)/2
       } else {
       xmiddle <- ((fhigh-p)*xlow-(flow-p)*xhigh)/(fhigh-flow)
       }
     fmiddle <- cdfhat(x,h,xmiddle)
-    if( fmiddle == p ) break
     if( fmiddle < p  ) {xlow   <-  xmiddle;  flow  <-  fmiddle}
     if( fmiddle > p  ) {xhigh  <-  xmiddle; fhigh  <-  fmiddle}
     if(  (abs(fmiddle - p)) <= tolerance ) break
-    if( i==60 ){print (" stop in rootcdffast with over 60 iterations");q()}
+    if( i==60 ){print (" stop in rootcdf with over 60 iterations");q()}
     }
   return(xmiddle)
   }
