@@ -67,7 +67,7 @@
         then you only need to enter the first five arguments.
      2) The data frame cannot contain missing values for any variables
         used in the complete model.
-     3) This function calls the adonetailp, adaptiveweights, rootcdffast,
+     3) This function calls the adonetailp, adaptiveweights, rootcdf,
         cdfhat, and shufflewh functions.
      4) This function is written in base R.  No packages are required. 
  
