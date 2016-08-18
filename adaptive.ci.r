@@ -1,6 +1,6 @@
 #
 #                                         Program:  adaptive.ci.r
-#                                         Revision Date: August 4, 2016
+#                                         Revision Date: August 18, 2016
 #
 #  This adaptive.ci function computes 95% confidence intervals limits
 #  for any single coefficient in a linear model having fixed effects.
@@ -9,7 +9,7 @@
 #  Reference: O'Gorman, T. W., Reducing the width of confidence intervals
 #             for the difference between two population means by inverting
 #             adaptive tests. Statistical Methods in Medical Research,
-#             in press.
+#             in press, 2016.
 #
 #  The confidence limits are found by calling the function
 #
@@ -22,9 +22,10 @@
 #        will be used in the analysis.
 #    2)  depvar is the name of the dependent variable in the model.
 #    3)  complete is a character string that specifies the full model
-#        including the confidence interval variable.
-#    4)  reduced is a character string that species the model that does
-#        not include the confidence interval variable.
+#        including the confidence interval variable. This model uses
+#        the same syntax as the lm() function.
+#    4)  reduced is a character string that species the reduced model
+#        that does not include the confidence interval variable.
 #    5)  civar is the character string that specifies the confidence
 #        inverval variable.
 #    6)  if equalwts = 1 the observations are given equal weights,
@@ -34,11 +35,14 @@
 #        is 2 blocks, so that the last permutation test will use 8000
 #        permutations.
 #    8)  s1 is one of three random number seeds. It can be any integer
-#        in the range of 1 to 30000.
-#    9)  s2 is another random number seed in the range of 1 to 30000.
-#   10)  s3 is the last random number seed in the range of 1 to 30000.
+#        in the range of 1 to 30268.
+#    9)  s2 is another random number seed in the range of 1 to 30306.
+#   10)  s3 is the last random number seed in the range of 1 to 30322.
 #   11)  if details = 1 (default) the details of the search will be printed.
-#        if details = 0 only the limits will be returned.
+#        if details = 0 the limits will be returned by the function, but
+#        no output will be printed.
+#        if details = 2 the weights given to the unpermuted data at the last
+#        block will be printed, in addition to the details = 1 output.
 #
 #  Notes:
 #
@@ -54,29 +58,27 @@
 #
 #  Examples:
 #
-#    If blood pressure data is used to create a data frame (dfbp) that has
-#    blood pressure (bp), the age (age), and a treatment indicator (group),
+#    If blood pressure data is used to create a data frame (bp.df) that has
+#    blood pressure (bp), age (age), and a treatment indicator (group),
 #    then we could find an adaptive 95% confidence interval for the
 #    treatment effect by using this code:
 #
 #      source("adaptive.ci.r")
-#      depvar   <- c("bp");
-#      complete <- c("bp~group");
-#      reduced  <- c("bp~1);
-#      civar    <- c("group");
-#      bplimits <- adaptive.ci(dfbp,depvar,complete,reduced,civar)
+#      bplimits <- adaptive.ci(ci.df=bp.df, depvar=c("bp"),
+#                     complete=c("bp~group"), reduced=c("bp~1),
+#                     civar=c("group") )
 #
 #    The vector bplimits will contain the lower and upper limits.
 #
 #    We could expand this example if we needed to include age as a
-#    covariate. We would use:
+#    covariate. If we wanted to use 3 blocks and we wanted to specify
+#    the three random number seeds we could use:
 #
 #      source("adaptive.ci.r")
-#      depvar   <- c("bp");
-#      complete <- c("bp~age+group")
-#      reduced  <- c("bp~age)
-#      civar    <- c("group");
-#      bplimits <- adaptive.ci(dfbp,depvar,complete,reduced,civar)
+#      bplimits <- adaptive.ci(ci.df=bp.df, depvar=c("bp"),
+#                     complete=c("bp ~ age + group"), reduced=c("bp ~ age),
+#                     civar=c("group"), nblocks=3,
+#                     s1 = 3682, s2 = 27812, s3 = 12973 )
 #
 #  These R functions were carefully checked and I believe
 #  that the functions are correct.  However, the author is not
@@ -99,10 +101,10 @@ limits <- double(2)
 
 r <- c(4000)
 
-if(details == 1) {
+if(details >= 1) {
   cat("\n")
   cat("  Input to adaptive.ci function:","\n\n")
-  cat("    Data set:",dataset,"\n")
+  cat("    Data frame:",deparse(substitute(ci.df)),"\n")
   cat("    Depandent variable: ",depvar, "\n")
   cat("    Complete model: ",complete,"\n")
   cat("    Reduced model : ",reduced,"\n")
@@ -111,6 +113,13 @@ if(details == 1) {
   cat("    Random seeds = ",s1,s2, s3,"\n")
   cat("    Number of permutations for first blocks = ",r,"\n\n")
   }
+
+if( (equalwts != 0) & (equalwts != 1) ) stop("equalwts must be 0 or 1.")
+if( nblocks > 12 ) stop("nblocks too large, n of perms exceed 32 million.")
+if( (s1 < 1) | (s1 > 30268) ) stop("s1 must be in the range of 1 to 30268.")
+if( (s2 < 1) | (s2 > 30306) ) stop("s2 must be in the range of 1 to 30268.")
+if( (s3 < 1) | (s3 > 30322) ) stop("s3 must be in the range of 1 to 30268.")
+if( (details < 0) | details > 2 ) stop("details must be 0, 1, or 2.")
 
 #     The next three lines reset the random number seeds.
 
@@ -147,8 +156,7 @@ e96 <- beta + t96*se
 e975<- beta + t975*se
 e99 <- beta + t99*se
 
-
-if(details == 1) cat("\n"," Traditional 95% Confidence Interval = ("
+if(details >= 1) cat("\n"," Traditional 95% Confidence Interval = ("
      ,round(e025,5),", ", round(e975,5),")", "\n","\n")
 
 ciadj.df <- ci.df
@@ -169,13 +177,15 @@ if(details == 1) {
 for(lowerlimit in 1:2) {
   if(lowerlimit == 1) lefttail <- 0 else lefttail <- 1
 
-  if((lowerlimit == 1) & (details == 1)) cat("\n\n"," Begin Lower Limit","\n\n\n")
-  if((lowerlimit != 1) & (details == 1)) cat("\n\n"," Begin Upper Limit","\n\n\n")
+  if((lowerlimit == 1) & (details >= 1)) cat("\n\n"," Begin Lower Limit","\n\n\n")
+  if((lowerlimit != 1) & (details >= 1)) cat("\n\n"," Begin Upper Limit","\n\n\n")
 
   if(lowerlimit == 2) {
     e01 <- e99
     e04 <- e96
     }
+
+  lastblock <- 0
 
   # The next line begins the search for an interval that includes the limit.
 
@@ -184,7 +194,7 @@ for(lowerlimit in 1:2) {
     ciadj.df[,depvar] <- ci.df[,depvar] - e01*ci.df[,civar]
 
     plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
-                        s1, s2, s3, n, lefttail, equalwts)
+                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
     p01 <- plist[[1]]
     s1  <- plist[[2]]
     s2  <- plist[[3]]
@@ -193,17 +203,17 @@ for(lowerlimit in 1:2) {
     ciadj.df[,depvar] <- ci.df[,depvar] - e04*ci.df[,civar]
 
     plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
-                        s1, s2, s3, n, lefttail, equalwts)
+                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
     p04 <- plist[[1]]
     s1  <- plist[[2]]
     s2  <- plist[[3]]
     s3  <- plist[[4]]
 
-    if( ( lowerlimit == 1) && (details == 1) ) {
+    if( ( lowerlimit == 1) && (details >= 1) ) {
       cat("Lower limit low estimate  = ", e01, " p-value = ", p01, "\n")
       cat("Lower limit high estimate = ", e04, " p-value = ", p04, "\n\n")
       }
-    if( ( lowerlimit != 1) && (details == 1) ) {
+    if( ( lowerlimit != 1) && (details >= 1) ) {
       cat("Upper limit low estimate  = ", e01, " p-value = ", p01, "\n")
       cat("Upper limit high estimate = ", e04, " p-value = ", p04, "\n\n")
       }
@@ -236,11 +246,6 @@ for(lowerlimit in 1:2) {
   l[1] <- e04-(probit(p04) - probitad2)/slopel
 
   if(nblocks >= 2) {
-    if(details == 1){ cat(" First Interpolated Estimate = ", l[1], "\n\n")
-      cat("          Estimate                                   Estimate","\n")
-      cat(" Block  Used in Test    R      p-value     SE(p)   Updated after test",
-      "\n\n")
-      }
     rnext <- r
 
     # The next line begins the search for an improved estimate.
@@ -251,16 +256,24 @@ for(lowerlimit in 1:2) {
       im1 <- i - 1
       yadj <- ci.df[,depvar] - l[im1]*ci.df[,civar]
       ciadj.df[,depvar] <- yadj
+      if(i == nblocks) lastblock <- 1
       plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, rnext,
-                          s1, s2, s3, n, lefttail, equalwts )
+                       s1, s2, s3, n, lefttail, equalwts, details, lastblock)
       p[im1] <- plist[[1]]
       s1  <- plist[[2]]
       s2  <- plist[[3]]
       s3  <- plist[[4]]
 
+    if( (i == 2) & (details >= 1) ){
+      cat(" First Interpolated Estimate = ", l[1], "\n\n")
+      cat("          Estimate                                   Estimate","\n")
+      cat(" Block  Used in Test    R      p-value     SE(p)   Updated after test",
+      "\n\n")
+      }
+
       l[i]  <- (l[im1] + (l[im1] - (probit(p[im1]) - probitad2)/slopel))/2
 
-      if(details == 1) {
+      if(details >= 1) {
         cat(format(i,width=5),
         format(round(l[im1],5), nsmall=5, width=13),
         format(rnext,width= 7),
@@ -293,10 +306,10 @@ for(lowerlimit in 1:2) {
 #
 
 adonetailp <- function(dfadonetail, depvar, complete, reduced, indvar, r,
-                       s1, s2, s3, n, lefttail, equalwts) {
+                    s1, s2, s3, n, lefttail, equalwts, details, lastblock) {
 localwt             <- double(n)
 dfadonetail$w2      <- double(n)
-dfadonetail$w2perm  <- double(n)
+dfadonetail$weights <- double(n)
   
 redu <- lm(as.formula(reduced), data = dfadonetail)
 yhat <- predict(redu)
@@ -306,6 +319,14 @@ if(equalwts == 1) {
   dfadonetail$w2 <- rep(1,n)
   } else {
   dfadonetail    <- adaptiveweights(dfadonetail,reduced)
+  if((details == 2) & (lastblock ==1)){
+    cat("\n\n")
+    cat(" The adaptive weights for the unpermuted data in the last block.",
+        "\n\n")
+    dfadonetail$weights <- sqrt(dfadonetail$w2)
+    print(dfadonetail)
+    cat("\n\n")
+    }
   }
 
 compu <- lm(as.formula(complete), data = dfadonetail, weights = dfadonetail$w2)
@@ -313,6 +334,8 @@ compu <- lm(as.formula(complete), data = dfadonetail, weights = dfadonetail$w2)
 tunperm <- summary(compu)$coefficients[indvar,3]
 
 e <- 0
+
+dfadonetail$w2perm  <- double(n)
 
 simple <- paste(depvar,c("~1"),sep="")
 
@@ -378,7 +401,6 @@ return(plist)
 #  Reference: O'Gorman, T. W., Adaptive Tests of Significance using
 #  Permutations of Residuals with R and SAS. 2012, Wiley.
 
-
 adaptiveweights <- function(dfweights,reduced) {
 red <- lm(as.formula(reduced), data=dfweights)
 resid <- residuals(red)
@@ -386,12 +408,8 @@ resid <- residuals(red)
 #                               compute traditional quantiles
 probs <- c(0.10, 0.25, 0.40, 0.60, 0.75, 0.90)
 q <- quantile(resid,probs,type=6)
-q10 <- q[1]
-q25 <- q[2]
-q40 <- q[3]
-q60 <- q[4]
-q75 <- q[5]
-q90 <- q[6]
+q10 <- q[1]; q25 <- q[2]; q40 <- q[3]
+q60 <- q[4]; q75 <- q[5]; q90 <- q[6]
 
 iqr <- q75 - q25
 sigmat <- iqr/1.349
@@ -432,7 +450,6 @@ dfweights$w2 <- w*w
 return(dfweights)
 }
 
-
 #
 #  This root finding function is used to compute the pth percentile,
 #  based on the smoothed cumulative distribution function.
@@ -469,7 +486,6 @@ rootcdf <- function(x,h,p,xlow,xhigh,lower,upper,tolerance) {
     }
   return(xmiddle)
   }
-
 
 #
 #   This function computes the smooth estimate of the cumulative
