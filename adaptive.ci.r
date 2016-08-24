@@ -1,6 +1,6 @@
 #
 #                                         Program:  adaptive.ci.r
-#                                         Revision Date: August 18, 2016
+#                                         Revision Date: August 24, 2016
 #
 #  This adaptive.ci function computes 95% confidence intervals limits
 #  for any single coefficient in a linear model having fixed effects.
@@ -103,23 +103,25 @@ r <- c(4000)
 
 if(details >= 1) {
   cat("\n")
-  cat("  Input to adaptive.ci function:","\n\n")
-  cat("    Data frame:",deparse(substitute(ci.df)),"\n")
-  cat("    Depandent variable: ",depvar, "\n")
-  cat("    Complete model: ",complete,"\n")
-  cat("    Reduced model : ",reduced,"\n")
-  cat("    Confidence Interval for : ",civar, "\n")
-  cat("    Maximum number of blocks = ", nblocks,"\n")
-  cat("    Random seeds = ",s1,s2, s3,"\n")
-  cat("    Number of permutations for first blocks = ",r,"\n\n")
+  cat("Function arguments for the adaptive.ci function:","\n\n")
+  cat("  Data frame:",deparse(substitute(ci.df)),"\n")
+  cat("  Depandent variable: ",depvar, "\n")
+  cat("  Complete model: ",complete,"\n")
+  cat("  Reduced model : ",reduced,"\n")
+  cat("  Confidence Interval for : ",civar, "\n")
+  cat("  Maximum number of blocks = ", nblocks,"\n")
+  cat("  Random seeds = ",s1,s2, s3,"\n")
+  cat("  Number of permutations for first blocks = ",r,"\n\n")
   }
 
 if( (equalwts != 0) & (equalwts != 1) ) stop("equalwts must be 0 or 1.")
-if( nblocks > 12 ) stop("nblocks too large, n of perms exceed 32 million.")
+if( nblocks > 12 ) {
+  stop("nblocks too large, number of permutations exceed 32 million.")
+                    }
 if( (s1 < 1) | (s1 > 30268) ) stop("s1 must be in the range of 1 to 30268.")
-if( (s2 < 1) | (s2 > 30306) ) stop("s2 must be in the range of 1 to 30268.")
-if( (s3 < 1) | (s3 > 30322) ) stop("s3 must be in the range of 1 to 30268.")
-if( (details < 0) | details > 2 ) stop("details must be 0, 1, or 2.")
+if( (s2 < 1) | (s2 > 30306) ) stop("s2 must be in the range of 1 to 30306.")
+if( (s3 < 1) | (s3 > 30322) ) stop("s3 must be in the range of 1 to 30322.")
+if( (details < 0) | (details > 2) ) stop("details must be 0, 1, or 2.")
 
 #     The next three lines reset the random number seeds.
 
@@ -161,7 +163,7 @@ if(details >= 1) cat("\n"," Traditional 95% Confidence Interval = ("
 
 ciadj.df <- ci.df
 
-if(details == 1) {
+if(details >= 1) {
   if(equalwts == 1) {
     cat("Equal Weights Used to Compute Limits; No adaptation","\n")
     } else {
@@ -177,12 +179,17 @@ if(details == 1) {
 for(lowerlimit in 1:2) {
   if(lowerlimit == 1) lefttail <- 0 else lefttail <- 1
 
-  if((lowerlimit == 1) & (details >= 1)) cat("\n\n"," Begin Lower Limit","\n\n\n")
-  if((lowerlimit != 1) & (details >= 1)) cat("\n\n"," Begin Upper Limit","\n\n\n")
+  if((lowerlimit == 1) & (details >= 1)) cat("\n\n","Begin Lower Limit","\n\n\n")
+  if((lowerlimit != 1) & (details >= 1)) cat("\n\n","Begin Upper Limit","\n\n\n")
+
+  if(lowerlimit == 1) {
+    lowest <- e01
+    hiest  <- e04
+    }
 
   if(lowerlimit == 2) {
-    e01 <- e99
-    e04 <- e96
+    lowest <- e96
+    hiest  <- e99
     }
 
   lastblock <- 0
@@ -191,59 +198,61 @@ for(lowerlimit in 1:2) {
 
   repeat {
 
-    ciadj.df[,depvar] <- ci.df[,depvar] - e01*ci.df[,civar]
+    ciadj.df[,depvar] <- ci.df[,depvar] - lowest*ci.df[,civar]
 
     plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
                         s1, s2, s3, n, lefttail, equalwts, details, lastblock)
-    p01 <- plist[[1]]
+    lowp <- plist[[1]]
+    s1   <- plist[[2]]
+    s2   <- plist[[3]]
+    s3   <- plist[[4]]
+
+    ciadj.df[,depvar] <- ci.df[,depvar] - hiest*ci.df[,civar]
+
+    plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
+                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
+    hip <- plist[[1]]
     s1  <- plist[[2]]
     s2  <- plist[[3]]
     s3  <- plist[[4]]
 
-    ciadj.df[,depvar] <- ci.df[,depvar] - e04*ci.df[,civar]
-
-    plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
-                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
-    p04 <- plist[[1]]
-    s1  <- plist[[2]]
-    s2  <- plist[[3]]
-    s3  <- plist[[4]]
-
-    if( ( lowerlimit == 1) && (details >= 1) ) {
-      cat("Lower limit low estimate  = ", e01, " p-value = ", p01, "\n")
-      cat("Lower limit high estimate = ", e04, " p-value = ", p04, "\n\n")
+    if( ( lowerlimit == 1) & (details >= 1) ) {
+      cat("    Lower limit, low estimate  = ", lowest, " p-value = ", lowp, "\n")
+      cat("    Lower limit, high estimate = ",  hiest, " p-value = ",  hip, "\n\n")
       }
-    if( ( lowerlimit != 1) && (details >= 1) ) {
-      cat("Upper limit low estimate  = ", e01, " p-value = ", p01, "\n")
-      cat("Upper limit high estimate = ", e04, " p-value = ", p04, "\n\n")
+    if( ( lowerlimit != 1) & (details >= 1) ) {
+      cat("    Upper limit, low estimate  = ", lowest, " p-value = ", lowp, "\n")
+      cat("    Upper limit, high estimate = ",  hiest, " p-value = ",  hip, "\n\n")
       }
 
     # In the next line, if the interval includes alpha/2 we stop the loop.
 
-    if( (p01 < alphad2) && (alphad2 < p04) ) break
+    if(lowerlimit==1 & lowp < alphad2 & alphad2 < hip) break
+    if(lowerlimit==2 & lowp > alphad2 & alphad2 > hip) break
 
-    shift <- (e04 - e01)/2
+    shift <- (hiest - lowest)/2
 
-    if(p04 < alphad2) {
-      e01 <- e01 + shift
-      e04 <- e04 + shift
+    if((lowerlimit == 1 &  hip < alphad2)|(lowerlimit==2 & hip > alphad2)) {
+      lowest <- lowest + shift
+      hiest  <-  hiest + shift
       }
 
-    if(p01 > alphad2) {
-      e01 <- e01 - shift
-      e04 <- e04 - shift
+    if((lowerlimit == 1 & lowp > alphad2)|(lowerlimit==2 & lowp < alphad2)) {
+      lowest <- lowest - shift
+      hiest  <-  hiest - shift
       }
     # Go back to try the new interval.
+    if(details >= 1) cat("    Restart with new estimates.","\n\n")
     }
 
   # Interval found.
 
-  slopel <- (probit(p04) - probit(p01))/(e04 - e01)
+  slope <- (probit(hip) - probit(lowp))/(hiest - lowest)
 
   l<- double(nblocks)
   p<- double(nblocks)
 
-  l[1] <- e04-(probit(p04) - probitad2)/slopel
+  l[1] <- hiest - (probit(hip) - probitad2)/slope
 
   if(nblocks >= 2) {
     rnext <- r
@@ -265,16 +274,16 @@ for(lowerlimit in 1:2) {
       s3  <- plist[[4]]
 
     if( (i == 2) & (details >= 1) ){
-      cat(" First Interpolated Estimate = ", l[1], "\n\n")
-      cat("          Estimate                                   Estimate","\n")
-      cat(" Block  Used in Test    R      p-value     SE(p)   Updated after test",
+      cat("    First Interpolated Estimate = ", l[1], "\n\n")
+      cat("             Estimate                                   Estimate","\n")
+      cat("    Block  Used in Test    R      p-value     SE(p)   Updated after test",
       "\n\n")
       }
 
-      l[i]  <- (l[im1] + (l[im1] - (probit(p[im1]) - probitad2)/slopel))/2
+      l[i]  <- (l[im1] + (l[im1] - (probit(p[im1]) - probitad2)/slope))/2
 
       if(details >= 1) {
-        cat(format(i,width=5),
+        cat(format(i,width=8),
         format(round(l[im1],5), nsmall=5, width=13),
         format(rnext,width= 7),
         format(round(p[im1],5), nsmall=5, width=10),

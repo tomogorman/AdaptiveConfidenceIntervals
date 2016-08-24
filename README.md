@@ -2,7 +2,7 @@
   README file for:
 
   Program:  adaptive.ci.r
-  Revision date: August 18, 2016
+  Revision date: August 24, 2016
 
 
   The adaptive.ci function computes 95% confidence intervals limits
