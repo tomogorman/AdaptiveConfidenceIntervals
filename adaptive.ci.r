@@ -1,20 +1,24 @@
 #
-#                                         Program:  adaptive.ci.r
-#                                         Revision Date: October 11, 2016
+#                                 Program:  adaptive.ci.r
+#                                 Revision Date: January 21, 2018
 #
 #  This adaptive.ci function computes 95% confidence intervals limits
 #  for a coefficient in a linear model having fixed effects.
 #  The observations are adaptively weighted by default. 
 #
-#  Reference: O'Gorman, T. W., Reducing the width of confidence intervals
-#             for the difference between two population means by inverting
-#             adaptive tests. Statistical Methods in Medical Research,
-#             in press, 2016.
+#  References: O'Gorman, T. W. (2016) Reducing the width of confidence intervals
+#              for the difference between two population means by inverting
+#              adaptive tests. Statistical Methods in Medical Research,
+#              27, 1422-1436.
+#
+#              O'Gorman, T. W., (2019) Constructing narrower confidence intervals
+#              by inverting adaptive tests. Australian & New Zealand
+#              Journal of Statistics, in press.
 #
 #  The confidence limits are found by calling the function
 #
-#       adaptive.ci <- function(ci.df, model, equalwts=0, nblocks=2,
-#         s1=7832, s2=25933, s3=19857, details=1)
+#       adaptive.ci <- function(ci.df, model, equalwts=0, permwts=0,
+#         nblocks=2, s1=7832, s2=25933, s3=19857, details=1)
 #
 #  The function arguments are:
 #
@@ -28,14 +32,19 @@
 #    3)  if equalwts = 1 the observations are given equal weights,
 #        if equalwts = 0 the observations are given adaptive weights,
 #        which is the default.
-#    4)  The number of blocks used in the approximation. The default is
+#    4)  if permwts = 1 the weights will be permuted,
+#        if permwts = 0 the weights wil be recomputed for each
+#        permutation if the reduced model includes more terms than
+#        the intercept, but if the reduced model is limited to only
+#        one intercept term the weights will be permuted.
+#    5)  The number of blocks used in the approximation. The default is
 #        is 2 blocks, so that the last permutation test will use 8000
 #        permutations.
-#    5)  s1 is one of three random number seeds. It can be any integer
+#    6)  s1 is one of three random number seeds. It can be any integer
 #        in the range of 1 to 30268.
-#    6)  s2 is another random number seed in the range of 1 to 30306.
-#    7)  s3 is the last random number seed in the range of 1 to 30322.
-#    8)  if details = 1 (default) the details of the search will be printed.
+#    7)  s2 is another random number seed in the range of 1 to 30306.
+#    8)  s3 is the last random number seed in the range of 1 to 30322.
+#    9)  if details = 1 (default) the details of the search will be printed.
 #        if details = 0 the limits will be returned by the function, but
 #        no output will be printed.
 #        if details = 2 the weights given to the unpermuted data at the last
@@ -43,15 +52,19 @@
 #
 #  Notes:
 #
-#    1) The first two arguments are required. If you want to find the
+#    1) The first argument must be the data set name, the second argument
+#       must be the model, the remaining arguments must be specified by
+#       their complete names, as shown in the examples below.
+#    2) The first two arguments are required. If you want to find the
 #       limits using adaptive weighting, and 2 blocks will give sufficient
-#       accuracy, and the default random number seeds are acceptable,
+#       accuracy, and you want to recompute the weights,   
+#       and the default random number seeds are acceptable,
 #       then you only need to enter the first two arguments.
-#    2) The data frame cannot contain missing values for any variables
+#    3) The data frame cannot contain missing values for any variables
 #       used in the complete model.
-#    3) This function calls the adonetailp, adaptiveweights, rootcdf,
+#    4) This function calls the adonetailp, adaptiveweights, rootcdf,
 #       cdfhat, and shufflewh functions.
-#    4) This function is written in base R.  No packages are required. 
+#    5) This function is written in base R.  No packages are required. 
 #
 #  Examples:
 #
@@ -70,7 +83,7 @@
 #    the three random number seeds we could use:
 #
 #      source("adaptive.ci.r")
-#      bplimits <- adaptive.ci(ci.df=bp.df, complete=c("bp ~ age + group"),
+#      bplimits <- adaptive.ci(ci.df=bp.df, model=c("bp ~ age + group"),
 #                     nblocks=3, s1 = 3682, s2 = 27812, s3 = 12973 )
 #
 #  Note that the group variable was specified as the last variable in the
@@ -84,7 +97,7 @@
 #  email at twogorman@gmail.com
 #
 
-adaptive.ci <- function(ci.df, model, equalwts=0, nblocks=2,
+adaptive.ci <- function(ci.df, model, equalwts=0, permwts=0, nblocks=2,
         s1=7832, s2=25933, s3=19857, details=1) {
 
 complete <- model
@@ -128,6 +141,8 @@ if(details >= 1) {
   cat("  Confidence Interval for : ",civar, "\n")
   cat("  Maximum number of blocks = ", nblocks,"\n")
   cat("  Random seeds = ",s1,s2, s3,"\n")
+  if(equalwts == 1) cat("  Equal weights used ","\n")
+  if(permwts == 1) cat("  Weights are permuted ","\n")
   cat("  Number of permutations for first blocks = ",r,"\n\n")
   }
 
@@ -218,7 +233,7 @@ for(lowerlimit in 1:2) {
     ciadj.df[,depvar] <- ci.df[,depvar] - lowest*ci.df[,civar]
 
     plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
-                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
+             s1, s2, s3, n, lefttail, equalwts, permwts, details, lastblock)
     lowp <- plist[[1]]
     s1   <- plist[[2]]
     s2   <- plist[[3]]
@@ -227,7 +242,7 @@ for(lowerlimit in 1:2) {
     ciadj.df[,depvar] <- ci.df[,depvar] - hiest*ci.df[,civar]
 
     plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, r,
-                        s1, s2, s3, n, lefttail, equalwts, details, lastblock)
+             s1, s2, s3, n, lefttail, equalwts, permwts, details, lastblock)
     hip <- plist[[1]]
     s1  <- plist[[2]]
     s2  <- plist[[3]]
@@ -284,7 +299,7 @@ for(lowerlimit in 1:2) {
       ciadj.df[,depvar] <- yadj
       if(i == nblocks) lastblock <- 1
       plist <- adonetailp(ciadj.df, depvar, complete, reduced, civar, rnext,
-                       s1, s2, s3, n, lefttail, equalwts, details, lastblock)
+             s1, s2, s3, n, lefttail, equalwts, permwts, details, lastblock)
       p[im1] <- plist[[1]]
       s1  <- plist[[2]]
       s2  <- plist[[3]]
@@ -332,7 +347,7 @@ for(lowerlimit in 1:2) {
 #
 
 adonetailp <- function(dfadonetail, depvar, complete, reduced, indvar, r,
-                    s1, s2, s3, n, lefttail, equalwts, details, lastblock) {
+         s1, s2, s3, n, lefttail, equalwts, permwts, details, lastblock) {
 localwt             <- double(n)
 dfadonetail$w2      <- double(n)
 dfadonetail$weights <- double(n)
@@ -367,9 +382,11 @@ simple <- paste(depvar,c("~1"),sep="")
 
 #  Simple models have the intercept as the only predictor variable in
 #  the reduced model.  In these models the adaptive weights do not need
-#  to be recomputed, they can be permuted.
+#  to be recomputed, they can be permuted because the recomputed weights
+#  will equal the permuted weights.
+#  Also, if permwts = 1 then the weights will be permuted.
 
-if(reduced == simple) {
+if( (reduced == simple) | (permwts == 1) ) {
   countnum <- double(n)
   ynew     <- double(n)
   yresshuf <- double(n)
@@ -397,7 +414,7 @@ if(reduced == simple) {
     }
   }
 
-if(reduced != simple) {
+if( (reduced != simple) & (permwts != 1) ) {
   for (k in 1:r) {
     sresidlist <- shufflewh(yresidual,s1,s2,s3,n)
     s1 <- sresidlist[[2]]
